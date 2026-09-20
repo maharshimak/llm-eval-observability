@@ -1,5 +1,7 @@
 # 🔭 LLM Eval & Observability
 
+[Live Interactive Demo](https://maharshimak.github.io/makma-ai-os/projects/llm-eval-observability/) · [AI Systems Lab](https://maharshimak.github.io/makma-ai-os/projects/)
+
 A compact evaluation and observability platform for **LLM/RAG regressions**.
 
 ## Implemented
