@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from math import isfinite
 
 from llm_eval.models import ExperimentSummary
 
@@ -25,9 +26,21 @@ def compare(
     *,
     max_pass_rate_drop: float = 0.02,
     max_relevance_drop: float = 0.03,
+    max_citation_drop: float = 0.03,
     max_latency_increase_ms: float = 500.0,
     max_cost_increase_usd: float | None = None,
 ) -> ComparisonDecision:
+    for value in (
+        max_pass_rate_drop,
+        max_relevance_drop,
+        max_citation_drop,
+        max_latency_increase_ms,
+        max_cost_increase_usd,
+    ):
+        if value is not None and (
+            type(value) not in (int, float) or not isfinite(value) or value < 0
+        ):
+            raise ValueError("Regression budgets must be finite and non-negative.")
     delta = ExperimentDelta(
         pass_rate=candidate.pass_rate - baseline.pass_rate,
         relevance=candidate.mean_relevance - baseline.mean_relevance,
@@ -41,6 +54,8 @@ def compare(
         reasons.append("pass-rate regression exceeds budget")
     if delta.relevance < -max_relevance_drop:
         reasons.append("relevance regression exceeds budget")
+    if delta.citation_coverage < -max_citation_drop:
+        reasons.append("citation-coverage regression exceeds budget")
     if delta.latency_p95_ms > max_latency_increase_ms:
         reasons.append("p95 latency increase exceeds budget")
     if max_cost_increase_usd is not None and delta.mean_cost_usd > max_cost_increase_usd:

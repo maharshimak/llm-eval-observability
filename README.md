@@ -6,6 +6,28 @@
 
 A compact evaluation and observability platform for **LLM/RAG regressions**.
 
+
+## Product contract — engineering upgrade
+
+**Problem and audience:** A release evaluation workstation for engineers comparing LLM/RAG candidate outputs with a baseline.
+
+**Live tool:** https://maharshimak.github.io/makma-ai-os/projects/llm-eval-observability/
+
+**Implemented browser workflow:** Batch case JSON, relevance/citation/forbidden checks, supplied latency/tokens/pricing, per-case failures, nearest-rank p95, cost/pass-rate/sample SLOs, Wilson interval, baseline deltas and regression budgets. Separately reported reliability does not affect case-derived release metrics.
+
+**Backend and parity contract:** Python comparison now gates citation regressions and rejects invalid regression budgets. Browser relevance uses phrase containment; the legacy Python metric uses token membership. The two modes are identified explicitly. Latency and token values are observations supplied by users, not measured inference.
+
+**Architecture:** `makma-ai-os/demo` is the shared web product source and Pages deployment. This repository owns its Python domain package. The central `tests/e2e` suite exercises all nine products; `tests/fixtures/python-parity.json` plus `scripts/generate_parity.py` guard shared mathematical contracts. Backend revisions used for regeneration are pinned in the central `backend-lock.json`.
+
+**Safety and limitations:** No live inference, semantic model judge or proof of factual grounding. Wilson intervals assume the supplied cases represent the population; synthetic samples are not production benchmarks. Inputs are validated, rendered user values are escaped, and deterministic results are not presented as model inference.
+
+**Verification:** Run `python -m ruff check .` and `python -m pytest -q`. `tests/test_engineering_upgrade.py` protects the new rejection/correctness paths. Central web checks: `npm ci`, `npm test`, `npm run build`, `npx playwright install --with-deps chromium`, `npm run test:e2e`. CI gates publishing on browser interactions and validates all public URLs after deployment.
+
+**Highest-value next work:** Versioned evaluation datasets, paired statistical comparisons and provider trace ingestion.
+
+**Provenance:** Independent MAK’MA Studio engineering implementation; examples are synthetic and no employer code or data is included. Existing MIT license applies.
+
+
 ## Implemented
 
 - typed experiment cases
