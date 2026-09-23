@@ -15,11 +15,11 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 
 **Implemented browser workflow:** Batch case JSON, relevance/citation/forbidden checks, supplied latency/tokens/pricing, per-case failures, nearest-rank p95, cost/pass-rate/sample SLOs, Wilson interval, baseline deltas and regression budgets. Separately reported reliability does not affect case-derived release metrics.
 
-**Backend and parity contract:** Python comparison now gates citation regressions and rejects invalid regression budgets. Browser relevance uses phrase containment; the legacy Python metric uses token membership. The two modes are identified explicitly. Latency and token values are observations supplied by users, not measured inference.
+**Backend and parity contract:** Python comparison gates citation regressions and rejects invalid regression budgets. Browser relevance uses phrase containment; the legacy Python metric uses token membership. The two modes are identified explicitly. Manually supplied candidates remain supported, and Python now also provides an OpenAI-compatible candidate adapter that measures wall-clock latency and consumes provider-reported token usage when available.
 
 **Architecture:** `makma-ai-os/demo` is the shared web product source and Pages deployment. This repository owns its Python domain package. The central `tests/e2e` suite exercises all nine products; `tests/fixtures/python-parity.json` plus `scripts/generate_parity.py` guard shared mathematical contracts. Backend revisions used for regeneration are pinned in the central `backend-lock.json`.
 
-**Safety and limitations:** No live inference, semantic model judge or proof of factual grounding. Wilson intervals assume the supplied cases represent the population; synthetic samples are not production benchmarks. Inputs are validated, rendered user values are escaped, and deterministic results are not presented as model inference.
+**Safety and limitations:** Optional live inference is available only through an explicitly configured OpenAI-compatible endpoint. There is still no semantic model judge or proof of factual grounding; citation checks verify identifiers rather than entailment. Wilson intervals assume the supplied cases represent the population, and synthetic samples are not production benchmarks. Inputs are validated, rendered user values are escaped, and deterministic results are not presented as model inference.
 
 **Verification:** Run `python -m ruff check .` and `python -m pytest -q`. `tests/test_engineering_upgrade.py` protects the new rejection/correctness paths. Central web checks: `npm ci`, `npm test`, `npm run build`, `npx playwright install --with-deps chromium`, `npm run test:e2e`. CI gates publishing on browser interactions and validates all public URLs after deployment.
 
@@ -35,7 +35,8 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 - lexical answer relevance
 - citation coverage
 - forbidden-phrase detection
-- token/cost estimation
+- token/cost estimation plus provider-reported usage capture when available
+- OpenAI-compatible live candidate execution with measured wall-clock latency and provider/model provenance
 - experiment aggregation
 - regression quality gates
 - JSONL trace store
@@ -106,7 +107,6 @@ print(decision)
 
 ## Roadmap
 
-- provider adapters
 - prompt/version registry
 - RAG faithfulness evaluator
 - pairwise model comparison
@@ -117,7 +117,7 @@ print(decision)
 
 ## Scope and limitations
 
-Relevance is lexical overlap and citation coverage checks identifiers, not factuality or entailment. Candidate outputs supply latency and token counts; these are validated but not independently measured. Cost is calculated only when caller-provided rates are configured; the API defaults to zero rates. JSONL traces, dataset loading and comparison are library utilities, not an integrated dashboard. No provider calls, live telemetry collector or deployed release automation is included.
+Relevance is lexical overlap and citation coverage checks identifiers, not factuality or entailment. Manual candidates can still supply latency/token observations; the OpenAI-compatible candidate instead measures wall-clock latency and uses provider-reported token usage when present, explicitly labeling a whitespace-token estimate fallback otherwise. Cost is calculated only when caller-provided rates are configured; the API defaults to zero rates. JSONL traces, dataset loading and comparison are library utilities, not an integrated dashboard. There is no continuous telemetry collector, semantic judge or deployed release automation.
 
 ## Installation and development
 
@@ -178,7 +178,7 @@ docker run --rm -p 127.0.0.1:8000:8000 llm-eval-observability
 
 ## Next engineering work
 
-Measured provider adapters; citation faithfulness; paired dataset comparison constraints; versioned pricing input; OpenTelemetry export. These are planned work, not current capabilities.
+Async/batched provider adapters; citation faithfulness; paired dataset comparison constraints; versioned datasets/pricing; OpenTelemetry export and CI release integration. These are planned work, not current capabilities.
 
 ## Contributing and security
 
