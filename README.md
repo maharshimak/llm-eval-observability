@@ -23,7 +23,7 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 
 **Verification:** Run `python -m ruff check .` and `python -m pytest -q`. `tests/test_engineering_upgrade.py` protects the new rejection/correctness paths. Central web checks: `npm ci`, `npm test`, `npm run build`, `npx playwright install --with-deps chromium`, `npm run test:e2e`. CI gates publishing on browser interactions and validates all public URLs after deployment.
 
-**Highest-value next work:** Versioned evaluation datasets, paired statistical comparisons and provider trace ingestion.
+**Highest-value next work:** Paired statistical comparisons, semantic/faithfulness evaluators and provider trace ingestion.
 
 **Provenance:** Independent MAK’MA Studio engineering implementation; examples are synthetic and no employer code or data is included. Existing MIT license applies.
 
@@ -37,6 +37,8 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 - forbidden-phrase detection
 - token/cost estimation plus provider-reported usage capture when available
 - OpenAI-compatible live candidate execution with measured wall-clock latency and provider/model provenance
+- versioned evaluation datasets with deterministic SHA-256 fingerprints
+- reproducible experiment manifests recording dataset, provider/model, prompt version and git revision
 - experiment aggregation
 - regression quality gates
 - JSONL trace store
@@ -110,7 +112,6 @@ print(decision)
 - prompt/version registry
 - RAG faithfulness evaluator
 - pairwise model comparison
-- dataset versioning
 - OpenTelemetry exporter
 - dashboard
 - CI deployment gate
