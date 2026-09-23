@@ -17,6 +17,9 @@ class ModelOutput:
     latency_ms: float
     input_tokens: int
     output_tokens: int
+    provider: str | None = None
+    model: str | None = None
+    usage_source: str = "reported"
 
 
 @dataclass(frozen=True, slots=True)
