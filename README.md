@@ -150,7 +150,7 @@ print(regression_gate(summary))
 
 ## Configuration
 
-Configuration is supplied through Python function/constructor arguments. No credentials or environment file are needed for the offline example.
+Offline evaluation needs no credentials. Live API evaluation reads `LLM_EVAL_BASE_URL` and `LLM_EVAL_MODEL`; optional settings are `LLM_EVAL_API_KEY`, `LLM_EVAL_TIMEOUT_SECONDS`, `LLM_EVAL_TEMPERATURE`, and `LLM_EVAL_API_TOKEN`.
 
 ## Service and API schema
 
@@ -158,7 +158,7 @@ Configuration is supplied through Python function/constructor arguments. No cred
 python -m uvicorn llm_eval.api:app --host 127.0.0.1 --port 8000
 ```
 
-Interactive endpoint schemas are at `http://127.0.0.1:8000/docs`; machine-readable schemas are at `/openapi.json`. These APIs have no built-in authentication. Use trusted local data and local access.
+Interactive endpoint schemas are at `http://127.0.0.1:8000/docs`; machine-readable schemas are at `/openapi.json`. The API is local-only by default. Set `LLM_EVAL_API_TOKEN` for bearer-authenticated remote access. `/v1/evaluate/live` executes the configured OpenAI-compatible candidate using `LLM_EVAL_BASE_URL`, `LLM_EVAL_MODEL`, optional `LLM_EVAL_API_KEY`, `LLM_EVAL_TIMEOUT_SECONDS`, and `LLM_EVAL_TEMPERATURE`.
 
 ## Container
 
