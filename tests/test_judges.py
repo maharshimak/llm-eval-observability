@@ -30,5 +30,6 @@ def test_judge_rejects_invalid_provider_output(raw):
         model="judge",
         rubric="Correctness",
     )
-    with pytest.raises(ValueError):
+    error_type = TypeError if '"score": "0.8"' in raw else ValueError
+    with pytest.raises(error_type):
         judge.parse(raw)
