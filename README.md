@@ -23,6 +23,8 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 
 **Verification:** Run `python -m ruff check .` and `python -m pytest -q`. `tests/test_engineering_upgrade.py` protects the new rejection/correctness paths. Central web checks: `npm ci`, `npm test`, `npm run build`, `npx playwright install --with-deps chromium`, `npm run test:e2e`. CI gates publishing on browser interactions and validates all public URLs after deployment.
 
+**Implemented semantic judging:** `OpenAICompatibleJudge` provides strict JSON rubric scoring with fail-closed output validation, and the protected `/v1/judge` API can run it against a configured provider. Deterministic lexical/citation metrics remain available for reproducible regression testing.
+
 **Highest-value next work:** Paired statistical comparisons, semantic/faithfulness evaluators and provider trace ingestion.
 
 **Provenance:** Independent MAK’MA Studio engineering implementation; examples are synthetic and no employer code or data is included. Existing MIT license applies.
