@@ -84,7 +84,7 @@ class OpenAICompatibleJudge:
         score = data.get("score")
         reason = data.get("reason")
         if isinstance(score, bool) or not isinstance(score, (int, float)):
-            raise ValueError("Judge score must be numeric.")
+            raise TypeError("Judge score must be numeric.")
         score = float(score)
         if not isfinite(score) or not 0.0 <= score <= 1.0:
             raise ValueError("Judge score must be finite and between 0 and 1.")
