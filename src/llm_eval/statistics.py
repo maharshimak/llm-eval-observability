@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass
 from math import isfinite
 from statistics import mean
-from collections.abc import Sequence
 
 
 @dataclass(frozen=True, slots=True)
