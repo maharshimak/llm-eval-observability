@@ -1,7 +1,7 @@
 import os
 import secrets
-from threading import BoundedSemaphore
 from dataclasses import asdict
+from threading import BoundedSemaphore
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -11,6 +11,7 @@ from llm_eval.judges import OpenAICompatibleJudge
 from llm_eval.models import EvalCase, ModelOutput
 from llm_eval.providers import OpenAICompatibleCandidate
 from llm_eval.runner import ExperimentRunner
+
 
 def _live_concurrency_limit() -> int:
     raw = os.environ.get("LLM_EVAL_MAX_CONCURRENT_LIVE", "2")
