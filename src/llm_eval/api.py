@@ -1,5 +1,6 @@
 import os
 import secrets
+from threading import BoundedSemaphore
 from dataclasses import asdict
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
@@ -10,6 +11,20 @@ from llm_eval.judges import OpenAICompatibleJudge
 from llm_eval.models import EvalCase, ModelOutput
 from llm_eval.providers import OpenAICompatibleCandidate
 from llm_eval.runner import ExperimentRunner
+
+def _live_concurrency_limit() -> int:
+    raw = os.environ.get("LLM_EVAL_MAX_CONCURRENT_LIVE", "2")
+    try:
+        value = int(raw)
+    except ValueError as error:
+        raise RuntimeError("LLM_EVAL_MAX_CONCURRENT_LIVE must be an integer.") from error
+    if not 1 <= value <= 16:
+        raise RuntimeError("LLM_EVAL_MAX_CONCURRENT_LIVE must be between 1 and 16.")
+    return value
+
+
+_live_provider_slots = BoundedSemaphore(_live_concurrency_limit())
+
 
 app = FastAPI(
     title="LLM Eval & Observability",
@@ -196,6 +211,11 @@ def evaluate(request: EvaluateRequest) -> dict[str, object]:
 def evaluate_live(request: LiveEvaluateRequest) -> dict[str, object]:
     cases = [_case(item) for item in request.items]
     candidate = _live_candidate()
+    if not _live_provider_slots.acquire(blocking=False):
+        raise HTTPException(
+            status_code=429,
+            detail="Live evaluation concurrency limit reached.",
+        )
     try:
         summary = ExperimentRunner().run(request.experiment, cases, candidate)
     except Exception as error:
@@ -203,6 +223,8 @@ def evaluate_live(request: LiveEvaluateRequest) -> dict[str, object]:
             status_code=502,
             detail=f"Live candidate execution failed: {type(error).__name__}",
         ) from error
+    finally:
+        _live_provider_slots.release()
     gate = regression_gate(summary)
     return {
         "summary": asdict(summary),
@@ -257,6 +279,11 @@ def judge(request: JudgeRequest) -> dict[str, object]:
         input_tokens=0,
         output_tokens=0,
     )
+    if not _live_provider_slots.acquire(blocking=False):
+        raise HTTPException(
+            status_code=429,
+            detail="Live evaluation concurrency limit reached.",
+        )
     try:
         result = evaluator.evaluate(case, output)
     except Exception as error:
@@ -264,4 +291,6 @@ def judge(request: JudgeRequest) -> dict[str, object]:
             status_code=502,
             detail=f"Judge execution failed: {type(error).__name__}",
         ) from error
+    finally:
+        _live_provider_slots.release()
     return asdict(result)
