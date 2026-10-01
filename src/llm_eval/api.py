@@ -63,12 +63,15 @@ class LiveEvaluateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     experiment: str = Field(min_length=1, max_length=300)
-    items: list[LiveEvalItem] = Field(min_length=1, max_length=250)
+    items: list[LiveEvalItem] = Field(min_length=1, max_length=25)
 
     @model_validator(mode="after")
-    def unique_ids(self):
+    def validate_batch(self):
         if len({item.id for item in self.items}) != len(self.items):
             raise ValueError("Evaluation item IDs must be unique.")
+        total_prompt_chars = sum(len(item.prompt) for item in self.items)
+        if total_prompt_chars > 200_000:
+            raise ValueError("Live evaluation prompt payload exceeds 200,000 characters.")
         return self
 
 
@@ -104,7 +107,15 @@ async def require_auth(
         return
 
     client_host = request.client.host if request.client else ""
-    if client_host not in {"127.0.0.1", "::1", "localhost", "testclient"}:
+    host_header = request.headers.get("host", "").casefold()
+    local_host = (
+        host_header in {"localhost", "127.0.0.1", "[::1]", "testserver"}
+        or host_header.startswith(("localhost:", "127.0.0.1:", "[::1]:"))
+    )
+    if (
+        client_host not in {"127.0.0.1", "::1", "localhost", "testclient"}
+        or not local_host
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Remote access requires LLM_EVAL_API_TOKEN.",
