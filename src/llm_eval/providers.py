@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from math import isfinite
 from dataclasses import dataclass
 from time import perf_counter
 from urllib import request
@@ -24,8 +25,10 @@ class OpenAICompatibleCandidate:
     def __post_init__(self) -> None:
         if not self.base_url.strip() or not self.model.strip():
             raise ValueError("base_url and model are required")
-        if self.timeout_seconds <= 0:
-            raise ValueError("timeout_seconds must be positive")
+        if not isfinite(self.timeout_seconds) or self.timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be finite and positive")
+        if not isfinite(self.temperature):
+            raise ValueError("temperature must be finite")
 
     def __call__(self, case: EvalCase) -> ModelOutput:
         payload = json.dumps(
