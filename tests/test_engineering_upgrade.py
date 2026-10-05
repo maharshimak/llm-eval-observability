@@ -1,7 +1,7 @@
 import pytest
 
 from llm_eval.comparison import compare, compare_paired_cases
-from llm_eval.models import ExperimentSummary
+from llm_eval.models import CaseMetrics, ExperimentSummary
 
 
 def summary(citations=1):
@@ -20,17 +20,21 @@ def test_invalid_regression_budgets_rejected(value):
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), -1, True])
 def test_invalid_paired_regression_budgets_rejected(value):
+    case = CaseMetrics(
+        case_id="1",
+        relevance=1.0,
+        citation_coverage=1.0,
+        forbidden_hit=False,
+        latency_ms=100.0,
+        estimated_cost_usd=0.001,
+        passed=True,
+    )
+    baseline = ExperimentSummary("base", 1, 1, 1, 100, 0.001, [case])
+    candidate = ExperimentSummary("candidate", 1, 1, 1, 100, 0.001, [case])
+
     with pytest.raises(ValueError):
         compare_paired_cases(
-            ExperimentSummary("base", 1, 1, 1, 100, 0.001, [
-                __import__("llm_eval.models", fromlist=["CaseMetrics"]).CaseMetrics(
-                    "1", 1, 1, False, 100, 0.001, True
-                )
-            ]),
-            ExperimentSummary("candidate", 1, 1, 1, 100, 0.001, [
-                __import__("llm_eval.models", fromlist=["CaseMetrics"]).CaseMetrics(
-                    "1", 1, 1, False, 100, 0.001, True
-                )
-            ]),
+            baseline,
+            candidate,
             max_pass_rate_drop=value,
         )
