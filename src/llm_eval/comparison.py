@@ -110,6 +110,25 @@ def compare_paired_cases(
     max_cost_increase_usd: float | None = None,
 ) -> StatisticalComparisonDecision:
     """Compare the same eval cases with practical budgets and bootstrap uncertainty."""
+    for value in (
+        max_pass_rate_drop,
+        max_relevance_drop,
+        max_citation_drop,
+        max_latency_increase_ms,
+        max_cost_increase_usd,
+    ):
+        if value is not None and (
+            type(value) not in (int, float) or not isfinite(value) or value < 0
+        ):
+            raise ValueError("Regression budgets must be finite and non-negative.")
+
+    if not 0 < confidence < 1:
+        raise ValueError("confidence must be between 0 and 1")
+    if isinstance(resamples, bool) or not isinstance(resamples, int) or resamples < 100:
+        raise ValueError("resamples must be an integer >= 100")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise TypeError("seed must be an integer")
+
     base = _case_map(baseline)
     cand = _case_map(candidate)
     if set(base) != set(cand):
