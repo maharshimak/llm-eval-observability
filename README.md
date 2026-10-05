@@ -25,7 +25,7 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 
 **Implemented semantic judging:** `OpenAICompatibleJudge` provides strict JSON rubric scoring with fail-closed output validation, and the protected `/v1/judge` API can run it against a configured provider. Deterministic lexical/citation metrics remain available for reproducible regression testing.
 
-**Highest-value next work:** Paired statistical comparisons, semantic/faithfulness evaluators and provider trace ingestion.
+**Highest-value next work:** Faithfulness evaluators, provider trace ingestion and release-gate automation. Paired statistical comparison is now implemented with practical regression budgets and bootstrap uncertainty.
 
 **Provenance:** Independent MAK’MA Studio engineering implementation; examples are synthetic and no employer code or data is included. Existing MIT license applies.
 
@@ -113,14 +113,14 @@ print(decision)
 
 - prompt/version registry
 - RAG faithfulness evaluator
-- pairwise model comparison
+- richer pairwise/semantic model comparison
 - OpenTelemetry exporter
 - dashboard
 - CI deployment gate
 
 ## Scope and limitations
 
-Relevance is lexical overlap and citation coverage checks identifiers, not factuality or entailment. Manual candidates can still supply latency/token observations; the OpenAI-compatible candidate instead measures wall-clock latency and uses provider-reported token usage when present, explicitly labeling a whitespace-token estimate fallback otherwise. Cost is calculated only when caller-provided rates are configured; the API defaults to zero rates. JSONL traces, dataset loading and comparison are library utilities, not an integrated dashboard. There is no continuous telemetry collector, semantic judge or deployed release automation.
+Relevance is lexical overlap and citation coverage checks identifiers, not factuality or entailment. Manual candidates can still supply latency/token observations; the OpenAI-compatible candidate instead measures wall-clock latency and uses provider-reported token usage when present, explicitly labeling a whitespace-token estimate fallback otherwise. Cost is calculated only when caller-provided rates are configured; the API defaults to zero rates. JSONL traces, dataset loading and comparison are library utilities, not an integrated dashboard. There is no continuous telemetry collector or deployed release automation. Semantic judging is optional and provider-backed; it is not used as proof of factual grounding.
 
 ## Installation and development
 
