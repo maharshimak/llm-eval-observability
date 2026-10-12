@@ -19,7 +19,7 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 
 **Architecture:** `makma-ai-os/demo` is the shared web product source and Pages deployment. This repository owns its Python domain package. The central `tests/e2e` suite exercises all nine products; `tests/fixtures/python-parity.json` plus `scripts/generate_parity.py` guard shared mathematical contracts. Backend revisions used for regeneration are pinned in the central `backend-lock.json`.
 
-**Safety and limitations:** Optional live inference is available only through an explicitly configured OpenAI-compatible endpoint. There is still no semantic model judge or proof of factual grounding; citation checks verify identifiers rather than entailment. Wilson intervals assume the supplied cases represent the population, and synthetic samples are not production benchmarks. Inputs are validated, rendered user values are escaped, and deterministic results are not presented as model inference.
+**Safety and limitations:** Optional live inference is available only through an explicitly configured OpenAI-compatible endpoint. An optional rubric-based OpenAI-compatible semantic judge exists, but it requires a separately configured provider and does not itself prove factual grounding; deterministic citation checks verify identifiers rather than entailment. Wilson intervals assume the supplied cases represent the population, and synthetic samples are not production benchmarks. Inputs are validated, rendered user values are escaped, and deterministic results are not presented as model inference.
 
 **Verification:** Run `python -m ruff check .` and `python -m pytest -q`. `tests/test_engineering_upgrade.py` protects the new rejection/correctness paths. Central web checks: `npm ci`, `npm test`, `npm run build`, `npx playwright install --with-deps chromium`, `npm run test:e2e`. CI gates publishing on browser interactions and validates all public URLs after deployment.
 
@@ -120,7 +120,7 @@ print(decision)
 
 ## Scope and limitations
 
-Relevance is lexical overlap and citation coverage checks identifiers, not factuality or entailment. Manual candidates can still supply latency/token observations; the OpenAI-compatible candidate instead measures wall-clock latency and uses provider-reported token usage when present, explicitly labeling a whitespace-token estimate fallback otherwise. Cost is calculated only when caller-provided rates are configured; the API defaults to zero rates. JSONL traces, dataset loading and comparison are library utilities, not an integrated dashboard. There is no continuous telemetry collector, semantic judge or deployed release automation.
+Relevance is lexical overlap and citation coverage checks identifiers, not factuality or entailment. Manual candidates can still supply latency/token observations; the OpenAI-compatible candidate instead measures wall-clock latency and uses provider-reported token usage when present, explicitly labeling a whitespace-token estimate fallback otherwise. Cost is calculated only when caller-provided rates are configured; the API defaults to zero rates. JSONL traces, dataset loading and comparison are library utilities, not an integrated dashboard. An optional rubric-based model judge is available behind provider configuration, but no continuous telemetry collector, integrated dashboard, or deployed release automation exists.
 
 ## Installation and development
 
@@ -190,3 +190,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). CI runs o
 ## License and provenance
 
 [MIT](LICENSE), copyright 2026 Maharshi Patel. This public portfolio implementation is independent of employer systems and contains no confidential employer code or data. Examples and test fixtures are synthetic.
+
+## Offline evaluation baseline
+
+Run `python -m scripts.benchmark_offline_eval` from the repository root after installing the package. Three synthetic exact-match cases validate scoring, citation coverage, latency percentile calculation, and pricing arithmetic against deterministic fixtures; pytest runs the same gate in CI. Output JSON is **not** a real model-quality or cost benchmark. An empirical release gate requires representative datasets and production-provider validation.
