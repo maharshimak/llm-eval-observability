@@ -21,6 +21,14 @@ class ComparisonDecision:
     reasons: list[str]
 
 
+def _validate_regression_budgets(
+    required: tuple[float, ...], optional_cost: float | None,
+) -> None:
+    values = required if optional_cost is None else (*required, optional_cost)
+    if any(type(value) not in (int, float) or not isfinite(value) or value < 0 for value in values):
+        raise ValueError("Regression budgets must be finite and non-negative.")
+
+
 def compare(
     baseline: ExperimentSummary,
     candidate: ExperimentSummary,
@@ -31,17 +39,17 @@ def compare(
     max_latency_increase_ms: float = 500.0,
     max_cost_increase_usd: float | None = None,
 ) -> ComparisonDecision:
-    for value in (
-        max_pass_rate_drop,
-        max_relevance_drop,
-        max_citation_drop,
-        max_latency_increase_ms,
+    _validate_regression_budgets(
+        (max_pass_rate_drop, max_relevance_drop, max_citation_drop, max_latency_increase_ms),
         max_cost_increase_usd,
-    ):
-        if value is not None and (
-            type(value) not in (int, float) or not isfinite(value) or value < 0
-        ):
-            raise ValueError("Regression budgets must be finite and non-negative.")
+    )
+    for summary in (baseline, candidate):
+        values = (
+            summary.pass_rate, summary.mean_relevance, summary.mean_citation_coverage,
+            summary.latency_p95_ms, summary.mean_cost_usd,
+        )
+        if any(type(value) not in (int, float) or not isfinite(value) for value in values):
+            raise ValueError("Comparison summary measurements must be finite numbers.")
     delta = ExperimentDelta(
         pass_rate=candidate.pass_rate - baseline.pass_rate,
         relevance=candidate.mean_relevance - baseline.mean_relevance,
@@ -110,6 +118,10 @@ def compare_paired_cases(
     max_cost_increase_usd: float | None = None,
 ) -> StatisticalComparisonDecision:
     """Compare the same eval cases with practical budgets and bootstrap uncertainty."""
+    _validate_regression_budgets(
+        (max_pass_rate_drop, max_relevance_drop, max_citation_drop, max_latency_increase_ms),
+        max_cost_increase_usd,
+    )
     base = _case_map(baseline)
     cand = _case_map(candidate)
     if set(base) != set(cand):
