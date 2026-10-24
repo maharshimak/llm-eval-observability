@@ -43,6 +43,7 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 - reproducible experiment manifests recording dataset, provider/model, prompt version and git revision
 - experiment aggregation
 - regression quality gates
+- aggregate comparison rejects non-finite measurements; aggregate and paired comparisons require finite, non-negative regression budgets (only the optional cost budget may be `None`)
 - JSONL trace store
 - FastAPI evaluation endpoint
 - tests
