@@ -15,7 +15,7 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 
 **Implemented browser workflow:** Batch case JSON, relevance/citation/forbidden checks, supplied latency/tokens/pricing, per-case failures, nearest-rank p95, cost/pass-rate/sample SLOs, Wilson interval, baseline deltas and regression budgets. Separately reported reliability does not affect case-derived release metrics.
 
-**Backend and parity contract:** Python comparison gates citation regressions and rejects invalid regression budgets. Browser relevance uses phrase containment; the legacy Python metric uses token membership. The two modes are identified explicitly. Manually supplied candidates remain supported, and Python now also provides an OpenAI-compatible candidate adapter that measures wall-clock latency and consumes provider-reported token usage when available.
+**Backend and parity contract:** Python comparison gates citation regressions and rejects invalid regression budgets. Browser relevance uses phrase containment. The Python metric tokenizes both the output and each expected term with the same rule and requires the term's tokens to appear contiguously, so multi-word terms such as "machine learning" can match (previously they never could); single-word terms behave as before. The two modes are still not identical (the browser matches raw substrings). Manually supplied candidates remain supported, and Python now also provides an OpenAI-compatible candidate adapter that measures wall-clock latency and consumes provider-reported token usage when available.
 
 **Architecture:** `makma-ai-os/demo` is the shared web product source and Pages deployment. This repository owns its Python domain package. The central `tests/e2e` suite exercises all nine products; `tests/fixtures/python-parity.json` plus `scripts/generate_parity.py` guard shared mathematical contracts. Backend revisions used for regeneration are pinned in the central `backend-lock.json`.
 
@@ -25,7 +25,7 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 
 **Implemented semantic judging:** `OpenAICompatibleJudge` provides strict JSON rubric scoring with fail-closed output validation, and the protected `/v1/judge` API can run it against a configured provider. Deterministic lexical/citation metrics remain available for reproducible regression testing.
 
-**Highest-value next work:** Paired statistical comparisons, semantic/faithfulness evaluators and provider trace ingestion.
+**Highest-value next work:** Semantic/faithfulness evaluators, streaming trace collection and OpenTelemetry export.
 
 **Provenance:** Independent MAK’MA Studio engineering implementation; examples are synthetic and no employer code or data is included. Existing MIT license applies.
 
@@ -42,11 +42,32 @@ A compact evaluation and observability platform for **LLM/RAG regressions**.
 - versioned evaluation datasets with deterministic SHA-256 fingerprints
 - reproducible experiment manifests recording dataset, provider/model, prompt version and git revision
 - experiment aggregation
-- regression quality gates
+- regression quality gates (invalid or NaN thresholds are rejected rather than silently passing)
+- paired baseline/candidate release gate with per-metric budgets, critical/non-critical metrics, fixed-seed paired bootstrap intervals and an exact McNemar test for binary outcomes (`llm_eval.release_gate`)
+- deterministic failure taxonomy per case: `forbidden_content`, `low_relevance`, `missing_expected_citation`, `latency_budget_exceeded` (`llm_eval.taxonomy`)
+- citation validation (cited ids must be a subset of the supplied evidence ids) and binary-relevance retrieval metrics: precision@k, recall@k, hit rate, MRR, nDCG@k (`llm_eval.citations`)
+- trace ingestion with nearest-rank p50/p95, mean/max latency, cost, token and error-rate aggregation, optionally grouped by model or span name (`llm_eval.traces`)
+- `makma.v1` contract operations (see below)
 - JSONL trace store
 - FastAPI evaluation endpoint
 - tests
 - Docker
+
+## MAK'MA `makma.v1` contract
+
+`llm_eval.contracts.run_operation(operation, payload, *, run_id=None, correlation_id=None)` returns the shared envelope, validated in tests against the vendored `contracts/makma.v1.schema.json`. `capabilities()` lists the operations with their JSON input schemas. The API exposes the same through `GET /v1/capabilities` and `POST /v1/ops/{operation}` (body = payload, optional `X-Correlation-ID` header), protected exactly like the other `/v1` routes. HTTP status is 200 for `ok`, 404 for `UNKNOWN_OPERATION`, 422 for `INVALID_INPUT`, 409 for `DATASET_MISMATCH`/`THRESHOLD_MISMATCH`; the body is always the envelope.
+
+| Operation | Input | `data` |
+| --- | --- | --- |
+| `evaluate` | `dataset` (`id`, `version`, `cases`), `predictions` (one per case), optional `thresholds`, `pricing` | dataset id/version/SHA-256 fingerprint, predictions SHA-256, summary (pass rate, mean relevance/citation coverage, p50/p95 latency, cost), per-case metrics with failure categories, failure counts |
+| `compare` | `baseline` and `candidate` (stored `evaluate` data), optional `policy` (`budgets`, `require_significance`, `confidence`, `resamples`, `seed`) | `allow`/`deny`, per-metric deltas, bootstrap intervals, McNemar counts and p-values, blocking reasons, warnings, case transitions; the envelope `policy` carries the decision |
+| `validate_citations` | `cited_ids`, `evidence_ids`, `require_citation` | validity, unknown/duplicate/uncited ids, citation precision, evidence coverage |
+| `score_retrieval` | `k`, `queries` (`query_id`, ranked `retrieved_ids`, `relevant_ids`) | per-query and macro-averaged precision@k, recall@k, hit rate, MRR, nDCG@k |
+| `ingest_traces` | `records` (`span_id`, `name`, `latency_ms`, `success`, optional cost/tokens/model), `group_by`, optional `slo` | overall and grouped aggregates; SLO result, with the envelope `policy` set when an SLO is supplied |
+
+All operations are `execution_mode: "deterministic_offline"`: lexical scoring, identifier checks, arithmetic and seeded resampling. None calls a model; the optional rubric judge stays on `/v1/judge` and is never mixed into these results (`evaluate` reports `"model_judge": "not_used"`). `data` contains no timestamps or random ids, so re-running an operation on the same input yields byte-identical canonical JSON (sorted keys, UTF-8, `(",", ":")` separators), whose SHA-256 is recorded as an `artifact` provenance entry. `compare` fails closed: reports from different dataset fingerprints (`DATASET_MISMATCH`) or thresholds (`THRESHOLD_MISMATCH`), or reports whose `passed` flags contradict their own metrics, are rejected instead of compared.
+
+Default release-gate budgets (largest tolerated worsening of the mean): pass rate 0.02, relevance 0.03, citation coverage 0.03, forbidden-hit rate 0.0 (all critical) and latency 500 ms (non-critical, reported as a warning). By default a critical breach blocks regardless of significance; with `require_significance` it blocks only when the paired bootstrap interval (continuous metrics) or exact McNemar test (binary metrics) also supports the regression at the configured confidence.
 
 ## Why this project matters
 
@@ -120,7 +141,7 @@ print(decision)
 
 ## Scope and limitations
 
-Relevance is lexical overlap and citation coverage checks identifiers, not factuality or entailment. Manual candidates can still supply latency/token observations; the OpenAI-compatible candidate instead measures wall-clock latency and uses provider-reported token usage when present, explicitly labeling a whitespace-token estimate fallback otherwise. Cost is calculated only when caller-provided rates are configured; the API defaults to zero rates. JSONL traces, dataset loading and comparison are library utilities, not an integrated dashboard. There is no continuous telemetry collector, semantic judge or deployed release automation.
+Relevance is lexical overlap and citation coverage checks identifiers, not factuality or entailment. Manual candidates can still supply latency/token observations; the OpenAI-compatible candidate instead measures wall-clock latency and uses provider-reported token usage when present, explicitly labeling a whitespace-token estimate fallback otherwise. Cost is calculated only when caller-provided rates are configured; the API defaults to zero rates. JSONL traces, dataset loading and comparison are library utilities, not an integrated dashboard. Trace ingestion aggregates records supplied by the caller; there is no continuous telemetry collector or deployed release automation. The bootstrap interval is a percentile bootstrap over cases and assumes cases are exchangeable; with few cases it is wide and McNemar p-values are coarse, which is why significance is opt-in rather than required for blocking. Citation validation and retrieval metrics compare identifiers only and use binary relevance. Stored-report checks in `compare` catch inconsistent pass flags, but cannot detect a report whose metrics were themselves fabricated.
 
 ## Installation and development
 
@@ -175,13 +196,14 @@ docker run --rm -p 127.0.0.1:8000:8000 llm-eval-observability
 | --- | --- |
 | `src/llm_eval/` | Implementation |
 | `tests/` | Offline unit and regression tests |
+| `contracts/makma.v1.schema.json` | Shared MAK'MA envelope schema (vendored, identical across repos) |
 | `docs/DESIGN.md` | Architecture and trust boundaries |
 | `.github/workflows/ci.yml` | Install, lint, tests, wheel and container build |
 | `pyproject.toml` | Dependencies and package configuration |
 
 ## Next engineering work
 
-Async/batched provider adapters; citation faithfulness; paired dataset comparison constraints; versioned datasets/pricing; OpenTelemetry export and CI release integration. These are planned work, not current capabilities.
+Async/batched provider adapters; citation faithfulness; versioned pricing; OpenTelemetry export and CI release integration. These are planned work, not current capabilities.
 
 ## Contributing and security
 
