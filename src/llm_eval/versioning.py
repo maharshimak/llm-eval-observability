@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from hashlib import sha256
 
+from llm_eval.dataset import dataset_fingerprint
 from llm_eval.models import EvalCase, ExperimentSummary, ModelOutput
 from llm_eval.runner import ExperimentRunner
 
@@ -35,16 +35,6 @@ class VersionedExperimentRun:
     summary: ExperimentSummary
 
 
-def _case_payload(case: EvalCase) -> dict[str, object]:
-    return {
-        "id": case.id,
-        "prompt": case.prompt,
-        "expected_terms": sorted(case.expected_terms),
-        "expected_citations": sorted(case.expected_citations),
-        "forbidden_phrases": sorted(case.forbidden_phrases),
-    }
-
-
 def build_versioned_dataset(
     dataset_id: str,
     version: str,
@@ -54,16 +44,10 @@ def build_versioned_dataset(
         raise ValueError("dataset_id and version are required")
     if not cases or len({case.id for case in cases}) != len(cases):
         raise ValueError("Dataset requires non-empty cases with unique IDs.")
-    payload = json.dumps(
-        [_case_payload(case) for case in cases],
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    ).encode()
     return VersionedDataset(
         id=dataset_id,
         version=version,
-        fingerprint=sha256(payload).hexdigest(),
+        fingerprint=dataset_fingerprint(cases),
         cases=tuple(cases),
     )
 
@@ -77,23 +61,21 @@ def run_versioned_experiment(
     prompt_version: str | None = None,
     git_revision: str | None = None,
 ) -> VersionedExperimentRun:
-    observed_provider: str | None = None
-    observed_model: str | None = None
+    providers: list[str | None] = []
+    models: list[str | None] = []
 
     def observed(case: EvalCase) -> ModelOutput:
-        nonlocal observed_provider, observed_model
         output = candidate(case)
-        if observed_provider is None:
-            observed_provider = output.provider
-        elif output.provider != observed_provider:
-            observed_provider = "mixed"
-        if observed_model is None:
-            observed_model = output.model
-        elif output.model != observed_model:
-            observed_model = "mixed"
+        providers.append(output.provider)
+        models.append(output.model)
         return output
 
     summary = runner.run(name, list(dataset.cases), observed)
+    # None is a legitimate observation ("not reported"), so it cannot double as
+    # the "nothing seen yet" sentinel: any disagreement, including None vs a
+    # value, is reported as "mixed".
+    observed_provider = providers[0] if len(set(providers)) == 1 else "mixed"
+    observed_model = models[0] if len(set(models)) == 1 else "mixed"
     manifest = ExperimentManifest(
         name=name,
         dataset_id=dataset.id,
