@@ -10,6 +10,29 @@ class GateResult:
     reasons: list[str]
 
 
+def _is_number(value: object) -> bool:
+    return type(value) in (int, float) and isfinite(value)
+
+
+def _validate_thresholds(
+    min_pass_rate: float,
+    min_relevance: float,
+    max_p95_latency_ms: float,
+    max_mean_cost_usd: float | None,
+) -> None:
+    # Every ordered comparison with NaN is False, so an unvalidated NaN threshold
+    # would silently pass any summary. Reject invalid configuration instead.
+    for name, value in (("min_pass_rate", min_pass_rate), ("min_relevance", min_relevance)):
+        if not _is_number(value) or not 0 <= value <= 1:
+            raise ValueError(f"{name} must be a finite number between 0 and 1.")
+    if not _is_number(max_p95_latency_ms) or max_p95_latency_ms < 0:
+        raise ValueError("max_p95_latency_ms must be finite and non-negative.")
+    if max_mean_cost_usd is not None and (
+        not _is_number(max_mean_cost_usd) or max_mean_cost_usd < 0
+    ):
+        raise ValueError("max_mean_cost_usd must be finite and non-negative.")
+
+
 def regression_gate(
     summary: ExperimentSummary,
     *,
@@ -18,6 +41,7 @@ def regression_gate(
     max_p95_latency_ms: float = 5000.0,
     max_mean_cost_usd: float | None = None,
 ) -> GateResult:
+    _validate_thresholds(min_pass_rate, min_relevance, max_p95_latency_ms, max_mean_cost_usd)
     reasons: list[str] = []
     if not summary.cases or any(
         not isfinite(v)

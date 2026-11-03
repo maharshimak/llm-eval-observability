@@ -1,10 +1,13 @@
 import os
 import secrets
 from dataclasses import asdict
+from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from llm_eval.contracts import capabilities, run_operation
 from llm_eval.gates import regression_gate
 from llm_eval.judges import OpenAICompatibleJudge
 from llm_eval.models import EvalCase, ModelOutput
@@ -265,3 +268,30 @@ def judge(request: JudgeRequest) -> dict[str, object]:
             detail=f"Judge execution failed: {type(error).__name__}",
         ) from error
     return asdict(result)
+
+
+_ERROR_STATUS = {
+    "UNKNOWN_OPERATION": 404,
+    "INVALID_INPUT": 422,
+    "DATASET_MISMATCH": 409,
+    "THRESHOLD_MISMATCH": 409,
+    "INTERNAL_ERROR": 500,
+}
+
+
+@app.get("/v1/capabilities", dependencies=protected)
+def contract_capabilities() -> dict[str, object]:
+    return capabilities()
+
+
+@app.post("/v1/ops/{operation}", dependencies=protected)
+def contract_operation(
+    operation: str,
+    payload: Annotated[dict[str, Any], Body()],
+    x_correlation_id: Annotated[str | None, Header()] = None,
+) -> JSONResponse:
+    """Run a makma.v1 operation. The response body is always the contract envelope."""
+    envelope = run_operation(operation, payload, correlation_id=x_correlation_id)
+    error = envelope["error"]
+    status_code = 200 if error is None else _ERROR_STATUS.get(error["code"], 400)
+    return JSONResponse(content=envelope, status_code=status_code)
